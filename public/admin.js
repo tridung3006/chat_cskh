@@ -2,8 +2,9 @@ let token = '';
 const $ = id => document.getElementById(id);
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...options.headers } });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Có lỗi xảy ra');
+  const type = response.headers.get('content-type') || '';
+  const data = type.includes('application/json') ? await response.json() : { error: `Server trả về HTML thay vì JSON (HTTP ${response.status}). Kiểm tra URL backend hoặc log hosting.` };
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
   return data;
 }
 function updateSnippet() {
@@ -27,8 +28,19 @@ $('settings').onsubmit = async event => {
   } catch (error) { $('msg').className = 'err'; $('msg').textContent = error.message; }
 };
 $('reindex').onclick = async () => {
-  try { $('msg').textContent = 'Đang lập chỉ mục…'; const d = await api('/api/admin/reindex', { method: 'POST' }); $('msg').className = 'ok'; $('msg').textContent = `Hoàn tất: ${d.pages} trang, ${d.chunks} đoạn.`; }
+  try {
+    $('reindex').disabled = true; $('msg').className = ''; $('msg').textContent = 'Đã bắt đầu lập chỉ mục…';
+    await api('/api/admin/reindex', { method: 'POST' });
+    while (true) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const state = await api('/api/admin/reindex-status');
+      if (state.status === 'completed') { $('msg').className = 'ok'; $('msg').textContent = `Hoàn tất: ${state.result.pages} trang, ${state.result.chunks} đoạn.`; break; }
+      if (state.status === 'failed') throw new Error(state.error);
+      $('msg').textContent = `Đang lập chỉ mục… bắt đầu lúc ${new Date(state.startedAt).toLocaleTimeString()}`;
+    }
+  }
   catch (error) { $('msg').className = 'err'; $('msg').textContent = error.message; }
+  finally { $('reindex').disabled = false; }
 };
 $('copy').onclick = async () => { await navigator.clipboard.writeText($('snippet').value); $('copy').textContent = 'Đã copy'; };
 ['title', 'color'].forEach(id => $(id).oninput = updateSnippet);

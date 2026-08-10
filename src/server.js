@@ -10,6 +10,7 @@ import { indexSize, loadIndex, search } from './search.js';
 import { getPublicAdminSettings, loadSettings, saveSettings } from './settings.js';
 
 const app = express();
+const reindexState = { status: 'idle', startedAt: null, finishedAt: null, result: null, error: null };
 if (config.trustProxy) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -71,8 +72,20 @@ app.post('/api/chat', async (req, res) => {
 
 app.post('/api/admin/reindex', async (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
-  try { res.json(await crawlWebsite()); }
-  catch (error) { console.error(error); res.status(500).json({ error: 'Indexing failed' }); }
+  if (reindexState.status === 'running') return res.status(409).json({ error: 'Đang có một tác vụ lập chỉ mục chạy', state: reindexState });
+  Object.assign(reindexState, { status: 'running', startedAt: new Date().toISOString(), finishedAt: null, result: null, error: null });
+  res.status(202).json({ ok: true, state: reindexState });
+  crawlWebsite().then(result => {
+    Object.assign(reindexState, { status: 'completed', finishedAt: new Date().toISOString(), result });
+  }).catch(error => {
+    console.error(error);
+    Object.assign(reindexState, { status: 'failed', finishedAt: new Date().toISOString(), error: 'Lập chỉ mục thất bại. Kiểm tra log server.' });
+  });
+});
+app.get('/api/admin/reindex-status', (req, res) => {
+  if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
+  res.set('Cache-Control', 'no-store');
+  res.json(reindexState);
 });
 
 await loadSettings();
