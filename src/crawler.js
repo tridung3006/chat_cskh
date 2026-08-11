@@ -16,10 +16,10 @@ function allowedUrl(input) {
   return url;
 }
 
-function splitText(text, size = 1200, overlap = 150) {
+function splitText(text, size = 1200, overlap = 150, minLength = 80) {
   const out = [];
   for (let i = 0; i < text.length; i += size - overlap) out.push(text.slice(i, i + size).trim());
-  return out.filter(x => x.length >= 80);
+  return out.filter(x => x.length >= minLength);
 }
 
 function isPrivateIp(address) {
@@ -106,7 +106,7 @@ export async function crawlWebsite() {
       splitText(page.text).forEach((part, i) => chunks.push({ id: `extra:${page.url}#${i}`, url: page.url, title: page.title, text: part }));
     } catch (error) { console.warn(`Skip extra URL ${input}: ${error.message}`); }
   }
-  splitText(config.customText || '').forEach((part, i) => chunks.push({ id: `custom:text#${i}`, url: config.websiteUrl.href, title: 'Kiến thức do quản trị viên cung cấp', text: part }));
+  splitText(config.customText || '', 1200, 150, 1).forEach((part, i) => chunks.push({ id: `custom:text#${i}`, url: config.websiteUrl.href, title: 'Kiến thức do quản trị viên cung cấp', text: part }));
   await saveIndex(chunks);
   return { pages: seen.size, chunks: chunks.length };
 }
