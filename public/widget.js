@@ -18,6 +18,12 @@
   shadow.querySelector('.head span').textContent = title;
   const open = shadow.querySelector('.open'), box = shadow.querySelector('.box'), msgs = shadow.querySelector('.msgs'), form = shadow.querySelector('form'), input = shadow.querySelector('input');
   let history = [];
+  const plainText = value => String(value || '')
+    .replace(/\*\*(.*?)\*\*/gs, '$1')
+    .replace(/__(.*?)__/gs, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '• ')
+    .replace(/`([^`]+)`/g, '$1');
   const add = (text, cls) => { const el = document.createElement('div'); el.className = `m ${cls}`; el.textContent = text; msgs.append(el); msgs.scrollTop = msgs.scrollHeight; return el; };
   open.onclick = () => { open.style.display='none'; box.style.display='block'; input.focus(); };
   shadow.querySelector('.close').onclick = () => { box.style.display='none'; open.style.display='block'; };
@@ -27,7 +33,7 @@
     try {
       const response = await fetch(`${api}/api/chat`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({question,history}) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
-      wait.textContent = data.answer; history = [...history,{role:'user',content:question},{role:'assistant',content:data.answer}].slice(-6);
+      const displayedAnswer = plainText(data.answer); wait.textContent = displayedAnswer; history = [...history,{role:'user',content:question},{role:'assistant',content:displayedAnswer}].slice(-6);
     } catch (err) { wait.textContent = err.message || 'Không thể kết nối. Vui lòng thử lại.'; }
   };
   document.body.append(host);
