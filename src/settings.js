@@ -23,6 +23,9 @@ function applySettings(value) {
   if (Array.isArray(value.origins)) config.origins = value.origins;
   config.botTitle = value.botTitle || 'Trợ lý tư vấn';
   config.botColor = /^#[0-9a-f]{6}$/i.test(value.botColor || '') ? value.botColor : '#111827';
+  config.extraUrls = Array.isArray(value.extraUrls) ? value.extraUrls : [];
+  config.customText = value.customText || '';
+  config.botInstructions = value.botInstructions || '';
 }
 
 export async function saveSettings(value) {
@@ -33,7 +36,10 @@ export async function saveSettings(value) {
     websiteUrl: value.websiteUrl || current.websiteUrl,
     origins: value.origins || current.origins,
     botTitle: value.botTitle || current.botTitle,
-    botColor: value.botColor || current.botColor
+    botColor: value.botColor || current.botColor,
+    extraUrls: value.extraUrls ?? current.extraUrls,
+    customText: value.customText ?? current.customText,
+    botInstructions: value.botInstructions ?? current.botInstructions
   };
   applySettings(next);
   const iv = crypto.randomBytes(12);
@@ -44,7 +50,7 @@ export async function saveSettings(value) {
 }
 
 export function getPrivateSettings() {
-  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827' };
+  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '' };
 }
 
 export function getPublicAdminSettings() {

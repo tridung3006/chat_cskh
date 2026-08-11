@@ -24,6 +24,8 @@ Tạo `ADMIN_TOKEN` mạnh trong PowerShell:
 
 Mở `/admin.html`, đăng nhập bằng `ADMIN_TOKEN`, cấu hình bot và copy đoạn HTML được tạo tự động.
 
+Dashboard cũng cho phép thêm tối đa 20 URL HTTPS, nhập nội dung kiến thức thủ công và đặt hướng dẫn riêng cho chatbot. Sau khi lưu URL hoặc nội dung, chạy **Lập chỉ mục lại** để đưa chúng vào kho tìm kiếm; hướng dẫn chatbot có hiệu lực ngay.
+
 Đặt đoạn này trước thẻ đóng `</head>` hoặc trong phần custom code/header của CMS:
 
 ```html

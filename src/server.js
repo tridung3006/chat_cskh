@@ -52,7 +52,9 @@ app.post('/api/admin/settings', async (req, res) => {
     if (!origins.length || origins.length > 20) throw new Error('Invalid origins');
     if (body.deepseekKey && (!String(body.deepseekKey).startsWith('sk-') || String(body.deepseekKey).length > 200)) throw new Error('Invalid API key');
     if (!/^#[0-9a-f]{6}$/i.test(body.botColor)) throw new Error('Invalid color');
-    await saveSettings({ deepseekKey: String(body.deepseekKey || ''), model: String(body.model || 'deepseek-chat').slice(0, 80), websiteUrl: websiteUrl.href, origins, botTitle: String(body.botTitle || 'Trợ lý tư vấn').slice(0, 80), botColor: body.botColor });
+    const extraUrls = String(body.extraUrls || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    if (extraUrls.length > 20 || extraUrls.some(value => { try { return new URL(value).protocol !== 'https:'; } catch { return true; } })) throw new Error('Invalid extra URLs');
+    await saveSettings({ deepseekKey: String(body.deepseekKey || ''), model: String(body.model || 'deepseek-chat').slice(0, 80), websiteUrl: websiteUrl.href, origins, botTitle: String(body.botTitle || 'Trợ lý tư vấn').slice(0, 80), botColor: body.botColor, extraUrls, customText: String(body.customText || '').slice(0, 100_000), botInstructions: String(body.botInstructions || '').slice(0, 10_000) });
     res.json({ ok: true, settings: getPublicAdminSettings() });
   } catch { res.status(400).json({ error: 'Cấu hình không hợp lệ' }); }
 });

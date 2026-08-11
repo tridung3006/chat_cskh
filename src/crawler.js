@@ -1,5 +1,7 @@
 import * as cheerio from 'cheerio';
 import robotsParser from 'robots-parser';
+import dns from 'node:dns/promises';
+import net from 'node:net';
 import { config } from './config.js';
 import { saveIndex } from './search.js';
 
@@ -18,6 +20,45 @@ function splitText(text, size = 1200, overlap = 150) {
   const out = [];
   for (let i = 0; i < text.length; i += size - overlap) out.push(text.slice(i, i + size).trim());
   return out.filter(x => x.length >= 80);
+}
+
+function isPrivateIp(address) {
+  if (net.isIPv4(address)) {
+    const [a, b] = address.split('.').map(Number);
+    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  const value = address.toLowerCase();
+  return value === '::1' || value === '::' || value.startsWith('fc') || value.startsWith('fd') || value.startsWith('fe80:');
+}
+
+async function safeExternalUrl(input) {
+  const url = new URL(input);
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) throw new Error('Extra URL must be public HTTPS');
+  const records = await dns.lookup(url.hostname, { all: true });
+  if (!records.length || records.some(record => isPrivateIp(record.address))) throw new Error('Extra URL resolves to a private address');
+  return url;
+}
+
+async function fetchExtraPage(input) {
+  let url = await safeExternalUrl(input);
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    const response = await fetch(url, { headers: { 'user-agent': 'WebsiteChatbot/1.0 (+explicit admin URL)', accept: 'text/html,text/plain' }, redirect: 'manual', signal: AbortSignal.timeout(12000) });
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      if (redirects === 3) throw new Error('Too many redirects');
+      url = await safeExternalUrl(new URL(response.headers.get('location'), url).href);
+      continue;
+    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const type = response.headers.get('content-type') || '';
+    const raw = await response.text();
+    if (raw.length > 5_000_000) throw new Error('Page too large');
+    if (type.includes('text/html')) {
+      const $ = cheerio.load(raw); $('script,style,noscript,svg,nav,footer,form,iframe').remove();
+      return { url: url.href, title: $('title').first().text().trim() || url.hostname, text: ($('main,article,[role="main"]').first().text() || $('body').text()).replace(/\s+/g, ' ').trim() };
+    }
+    if (type.includes('text/plain')) return { url: url.href, title: url.hostname, text: raw.replace(/\s+/g, ' ').trim() };
+    throw new Error('Unsupported content type');
+  }
 }
 
 export async function crawlWebsite() {
@@ -59,6 +100,13 @@ export async function crawlWebsite() {
       await sleep(100);
     } catch (error) { console.warn(`Skip ${url.href}: ${error.message}`); }
   }
+  for (const input of (config.extraUrls || []).slice(0, 20)) {
+    try {
+      const page = await fetchExtraPage(input);
+      splitText(page.text).forEach((part, i) => chunks.push({ id: `extra:${page.url}#${i}`, url: page.url, title: page.title, text: part }));
+    } catch (error) { console.warn(`Skip extra URL ${input}: ${error.message}`); }
+  }
+  splitText(config.customText || '').forEach((part, i) => chunks.push({ id: `custom:text#${i}`, url: config.websiteUrl.href, title: 'Kiến thức do quản trị viên cung cấp', text: part }));
   await saveIndex(chunks);
   return { pages: seen.size, chunks: chunks.length };
 }

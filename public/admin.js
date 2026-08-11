@@ -16,14 +16,14 @@ $('loginBtn').onclick = async () => {
   try {
     const s = await api('/api/admin/settings');
     $('login').style.display = 'none'; $('panel').style.display = 'block';
-    $('model').value = s.model; $('website').value = s.websiteUrl; $('origins').value = s.origins.join(','); $('title').value = s.botTitle; $('color').value = s.botColor;
+    $('model').value = s.model; $('website').value = s.websiteUrl; $('origins').value = s.origins.join(','); $('title').value = s.botTitle; $('color').value = s.botColor; $('extraUrls').value = (s.extraUrls || []).join('\n'); $('customText').value = s.customText || ''; $('instructions').value = s.botInstructions || '';
     $('keyHint').textContent = s.hasApiKey ? `Đã lưu key: ${s.apiKeyHint}` : 'Chưa có API key'; updateSnippet();
   } catch (error) { $('loginMsg').className = 'err'; $('loginMsg').textContent = error.message; }
 };
 $('settings').onsubmit = async event => {
   event.preventDefault();
   try {
-    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ deepseekKey: $('apiKey').value, model: $('model').value, websiteUrl: $('website').value, origins: $('origins').value, botTitle: $('title').value, botColor: $('color').value }) });
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ deepseekKey: $('apiKey').value, model: $('model').value, websiteUrl: $('website').value, origins: $('origins').value, botTitle: $('title').value, botColor: $('color').value, extraUrls: $('extraUrls').value, customText: $('customText').value, botInstructions: $('instructions').value }) });
     $('apiKey').value = ''; $('msg').className = 'ok'; $('msg').textContent = 'Đã lưu và mã hóa cấu hình.'; updateSnippet();
   } catch (error) { $('msg').className = 'err'; $('msg').textContent = error.message; }
 };
