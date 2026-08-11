@@ -107,6 +107,9 @@ export async function crawlWebsite() {
     } catch (error) { console.warn(`Skip extra URL ${input}: ${error.message}`); }
   }
   splitText(config.customText || '', 1200, 150, 1).forEach((part, i) => chunks.push({ id: `custom:text#${i}`, url: config.websiteUrl.href, title: 'Kiến thức do quản trị viên cung cấp', text: part }));
+  for (const file of (config.knowledgeFiles || [])) {
+    splitText(file.text || '', 1200, 150, 1).forEach((part, i) => chunks.push({ id: `custom:file:${file.name}#${i}`, url: config.websiteUrl.href, title: `Tệp kiến thức: ${file.name}`, text: part }));
+  }
   await saveIndex(chunks);
   return { pages: seen.size, chunks: chunks.length };
 }

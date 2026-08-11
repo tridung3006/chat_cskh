@@ -26,6 +26,11 @@ function applySettings(value) {
   config.extraUrls = Array.isArray(value.extraUrls) ? value.extraUrls : [];
   config.customText = value.customText || '';
   config.botInstructions = value.botInstructions || '';
+  config.welcomeMessage = value.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?';
+  config.commands = Array.isArray(value.commands) ? value.commands : [];
+  config.knowledgeFiles = Array.isArray(value.knowledgeFiles) ? value.knowledgeFiles : [];
+  config.iconVersion = value.iconVersion || 0;
+  config.iconMime = value.iconMime || '';
 }
 
 export async function saveSettings(value) {
@@ -39,7 +44,12 @@ export async function saveSettings(value) {
     botColor: value.botColor || current.botColor,
     extraUrls: value.extraUrls ?? current.extraUrls,
     customText: value.customText ?? current.customText,
-    botInstructions: value.botInstructions ?? current.botInstructions
+    botInstructions: value.botInstructions ?? current.botInstructions,
+    welcomeMessage: value.welcomeMessage ?? current.welcomeMessage,
+    commands: value.commands ?? current.commands,
+    knowledgeFiles: value.knowledgeFiles ?? current.knowledgeFiles,
+    iconVersion: value.iconVersion ?? current.iconVersion,
+    iconMime: value.iconMime ?? current.iconMime
   };
   applySettings(next);
   const iv = crypto.randomBytes(12);
@@ -50,10 +60,10 @@ export async function saveSettings(value) {
 }
 
 export function getPrivateSettings() {
-  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '' };
+  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], knowledgeFiles: config.knowledgeFiles || [], iconVersion: config.iconVersion || 0, iconMime: config.iconMime || '' };
 }
 
 export function getPublicAdminSettings() {
   const s = getPrivateSettings();
-  return { ...s, deepseekKey: '', hasApiKey: Boolean(s.deepseekKey), apiKeyHint: s.deepseekKey ? `${s.deepseekKey.slice(0, 3)}••••${s.deepseekKey.slice(-4)}` : '' };
+  return { ...s, deepseekKey: '', knowledgeFiles: s.knowledgeFiles.map(file => ({ name: file.name, characters: file.text.length })), hasApiKey: Boolean(s.deepseekKey), apiKeyHint: s.deepseekKey ? `${s.deepseekKey.slice(0, 3)}••••${s.deepseekKey.slice(-4)}` : '', hasIcon: Boolean(s.iconVersion) };
 }
