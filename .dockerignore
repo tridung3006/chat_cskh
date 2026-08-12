@@ -1,6 +1,8 @@
-node_modules/
+.git
+.github
 .env
-data/
+data
+node_modules
 npm-debug.log*
+outputs
 *service-account*.json
-firebase-debug.log*

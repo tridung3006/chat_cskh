@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { firebaseIsEnabled, loadFirebaseChunks, saveFirebaseChunks } from './firebase-store.js';
 
 const INDEX_FILE = path.resolve('data/index.json');
 let chunks = [];
@@ -9,14 +10,29 @@ export function tokenize(text) {
 }
 
 export async function loadIndex() {
-  try { chunks = JSON.parse(await fs.readFile(INDEX_FILE, 'utf8')).chunks || []; }
+  let localChunks = [];
+  try { localChunks = JSON.parse(await fs.readFile(INDEX_FILE, 'utf8')).chunks || []; }
   catch (e) { if (e.code !== 'ENOENT') throw e; chunks = []; }
+  if (firebaseIsEnabled()) {
+    try {
+      const remoteChunks = await loadFirebaseChunks();
+      if (remoteChunks.length) chunks = remoteChunks;
+      else if (localChunks.length) { await saveFirebaseChunks(localChunks); chunks = localChunks; }
+      else chunks = [];
+    } catch (error) {
+      console.error(`Cannot load Firebase RAG index: ${error.message}`);
+      chunks = localChunks;
+    }
+  } else chunks = localChunks;
   return chunks.length;
 }
 
 export async function saveIndex(nextChunks) {
+  if (firebaseIsEnabled()) await saveFirebaseChunks(nextChunks);
   await fs.mkdir(path.dirname(INDEX_FILE), { recursive: true });
-  await fs.writeFile(INDEX_FILE, JSON.stringify({ updatedAt: new Date().toISOString(), chunks: nextChunks }), 'utf8');
+  const temp = `${INDEX_FILE}.${process.pid}.tmp`;
+  await fs.writeFile(temp, JSON.stringify({ updatedAt: new Date().toISOString(), chunks: nextChunks }), { encoding: 'utf8', mode: 0o600 });
+  await fs.rename(temp, INDEX_FILE);
   chunks = nextChunks;
 }
 

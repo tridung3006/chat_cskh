@@ -5,19 +5,25 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { Worker } from 'node:worker_threads';
 import { config } from './config.js';
 import { askDeepSeek } from './deepseek.js';
 import { crawlWebsite } from './crawler.js';
 import { indexSize, loadIndex, search } from './search.js';
 import { getPublicAdminSettings, loadSettings, saveSettings } from './settings.js';
-import mammoth from 'mammoth';
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import { firebaseStatus } from './firebase-store.js';
 
 const app = express();
 const reindexState = { status: 'idle', startedAt: null, finishedAt: null, result: null, error: null };
 if (config.trustProxy) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use((req, res, next) => {
+  const incoming = String(req.headers['x-request-id'] || '');
+  req.requestId = /^[a-zA-Z0-9._-]{8,80}$/.test(incoming) ? incoming : crypto.randomUUID();
+  res.setHeader('X-Request-Id', req.requestId);
+  next();
+});
 app.use(express.json({ limit: '256kb' }));
 
 const corsCheck = cors({ origin(origin, cb) {
@@ -26,7 +32,8 @@ const corsCheck = cors({ origin(origin, cb) {
 }, methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'Authorization'] });
 
 app.use('/api', corsCheck);
-app.use('/api/chat', rateLimit({ windowMs: 60_000, limit: 15, standardHeaders: true, legacyHeaders: false }));
+const jsonRateLimit = options => rateLimit({ windowMs: 60_000, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => res.status(429).json({ error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' }), ...options });
+app.use('/api/chat', jsonRateLimit({ limit: config.chatRateLimit }));
 app.use('/widget.js', cors({ origin: '*' }));
 app.use(express.static('public', { maxAge: '1h', setHeaders(res, filePath) {
   if (filePath.endsWith('widget.js')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -34,10 +41,37 @@ app.use(express.static('public', { maxAge: '1h', setHeaders(res, filePath) {
 
 function isAdmin(req) {
   const supplied = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  return supplied.length === config.adminToken.length && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(config.adminToken));
+  const suppliedBytes = Buffer.from(supplied);
+  const expectedBytes = Buffer.from(config.adminToken);
+  return suppliedBytes.length === expectedBytes.length && crypto.timingSafeEqual(suppliedBytes, expectedBytes);
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, indexedChunks: indexSize() }));
+const adminAuthLimit = jsonRateLimit({ limit: config.adminRateLimit, skipSuccessfulRequests: true });
+const adminOperationLimit = jsonRateLimit({ limit: 60 });
+app.use('/api/admin', adminAuthLimit, adminOperationLimit, (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  if (config.adminAllowedIps.length && !config.adminAllowedIps.includes(req.ip)) return res.status(403).json({ error: 'IP quản trị không được phép' });
+  if (!isAdmin(req)) {
+    console.warn(JSON.stringify({ event: 'admin_auth_failed', requestId: req.requestId, ip: req.ip, at: new Date().toISOString() }));
+    return res.status(401).json({ error: 'Thông tin đăng nhập không hợp lệ' });
+  }
+  if (req.method !== 'GET') res.once('finish', () => console.info(JSON.stringify({ event: 'admin_action', requestId: req.requestId, method: req.method, path: req.path, status: res.statusCode, ip: req.ip, at: new Date().toISOString() })));
+  next();
+});
+
+function parseDocumentInWorker(ext, buffer) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./file-parser-worker.js', import.meta.url), {
+      workerData: { ext, data: buffer },
+      resourceLimits: { maxOldGenerationSizeMb: 64, maxYoungGenerationSizeMb: 16, stackSizeMb: 4 }
+    });
+    const timer = setTimeout(() => { worker.terminate(); reject(new Error('File parser timeout')); }, 10_000);
+    worker.once('message', result => { clearTimeout(timer); worker.terminate(); result.error ? reject(new Error(result.error)) : resolve(result.text); });
+    worker.once('error', error => { clearTimeout(timer); reject(error); });
+  });
+}
+
+app.get('/api/health', (_req, res) => res.json({ ok: true, indexedChunks: indexSize(), persistentRag: config.firebaseEnabled ? 'firebase' : 'local' }));
 app.get('/api/widget-config', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ title: config.botTitle || 'Trợ lý tư vấn', color: config.botColor || '#111827', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], iconUrl: config.iconVersion ? `/api/bot-icon?v=${config.iconVersion}` : '' });
@@ -51,12 +85,16 @@ app.get('/api/admin/settings', (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Sai mã quản trị' });
   res.json(getPublicAdminSettings());
 });
+app.get('/api/admin/firebase-status', async (_req, res) => {
+  try { res.json(await firebaseStatus()); }
+  catch (error) { res.status(503).json({ enabled: config.firebaseEnabled, connected: false, error: 'Không thể kết nối Firebase' }); }
+});
 app.post('/api/admin/settings', async (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Sai mã quản trị' });
   try {
     const body = req.body || {};
     const websiteUrl = new URL(body.websiteUrl);
-    if (!['https:', 'http:'].includes(websiteUrl.protocol)) throw new Error('Invalid website URL');
+    if (websiteUrl.protocol !== 'https:' || websiteUrl.username || websiteUrl.password || websiteUrl.port) throw new Error('Invalid website URL');
     const origins = [...new Set([websiteUrl.origin, ...String(body.origins || '').split(',').map(x => x.trim()).filter(Boolean).map(x => new URL(x).origin)])];
     if (!origins.length || origins.length > 20) throw new Error('Invalid origins');
     if (body.deepseekKey && (!String(body.deepseekKey).startsWith('sk-') || String(body.deepseekKey).length > 200)) throw new Error('Invalid API key');
@@ -69,13 +107,13 @@ app.post('/api/admin/settings', async (req, res) => {
     res.json({ ok: true, settings: getPublicAdminSettings() });
   } catch { res.status(400).json({ error: 'Cấu hình không hợp lệ' }); }
 });
-app.post('/api/admin/icon', express.raw({ type: 'application/octet-stream', limit: '512kb' }), async (req, res) => {
+app.post('/api/admin/icon', express.raw({ type: 'application/octet-stream', limit: '2mb' }), async (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
   const mime = String(req.headers['x-file-type'] || '');
   const signatures = { 'image/png': [0x89,0x50,0x4e,0x47], 'image/jpeg': [0xff,0xd8,0xff], 'image/gif': [0x47,0x49,0x46,0x38], 'image/webp': [0x52,0x49,0x46,0x46] };
   const signature = signatures[mime];
   const validWebp = mime !== 'image/webp' || req.body?.subarray(8, 12).toString('ascii') === 'WEBP';
-  if (!Buffer.isBuffer(req.body) || !req.body.length || !signature || !signature.every((byte, i) => req.body[i] === byte) || !validWebp) return res.status(400).json({ error: 'Chỉ chấp nhận PNG, JPEG, WebP hoặc GIF hợp lệ, tối đa 512 KB.' });
+  if (!Buffer.isBuffer(req.body) || !req.body.length || !signature || !signature.every((byte, i) => req.body[i] === byte) || !validWebp) return res.status(400).json({ error: 'Chỉ chấp nhận PNG, JPEG, WebP hoặc GIF hợp lệ, tối đa 2 MB.' });
   await fs.mkdir(path.resolve('data'), { recursive: true });
   await fs.writeFile(path.resolve('data/bot-icon.bin'), req.body, { mode: 0o600 });
   const iconVersion = Date.now(); await saveSettings({ iconVersion, iconMime: mime });
@@ -88,8 +126,7 @@ app.post('/api/admin/knowledge-file', express.raw({ type: 'application/octet-str
     const ext = path.extname(name).toLowerCase();
     if (!name || !Buffer.isBuffer(req.body) || !req.body.length || !['.txt','.md','.csv','.json','.pdf','.docx'].includes(ext)) throw new Error('Unsupported file');
     let text;
-    if (ext === '.pdf') text = (await pdfParse(req.body)).text;
-    else if (ext === '.docx') text = (await mammoth.extractRawText({ buffer: req.body })).value;
+    if (ext === '.pdf' || ext === '.docx') text = await parseDocumentInWorker(ext, req.body);
     else text = req.body.toString('utf8');
     text = text.replace(/\0/g, '').trim().slice(0, 200_000);
     if (!text) throw new Error('Empty file');
@@ -135,6 +172,16 @@ app.get('/api/admin/reindex-status', (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
   res.set('Cache-Control', 'no-store');
   res.json(reindexState);
+});
+app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint không tồn tại.', requestId: req.requestId }));
+app.use((error, req, res, next) => {
+  if (error?.type === 'entity.too.large') return res.status(413).json({ error: 'File hoặc dữ liệu upload vượt giới hạn cho phép.' });
+  if (error instanceof SyntaxError && error.status === 400 && 'body' in error) return res.status(400).json({ error: 'JSON không hợp lệ.' });
+  const status = error?.message === 'Origin not allowed' ? 403 : 500;
+  const requestId = req.requestId || crypto.randomUUID();
+  console.error(JSON.stringify({ event: 'request_error', requestId, status, message: error?.message || 'Unknown error' }));
+  if (res.headersSent) return next(error);
+  res.status(status).json({ error: status === 403 ? 'Origin không được phép.' : 'Đã xảy ra lỗi máy chủ.', requestId });
 });
 
 await loadSettings();

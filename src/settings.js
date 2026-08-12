@@ -2,18 +2,40 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
+import { firebaseIsEnabled, loadFirebaseKnowledgeFiles, saveFirebaseKnowledgeFiles } from './firebase-store.js';
 
 const file = path.resolve('data/settings.enc');
-const key = crypto.scryptSync(config.adminToken, 'deepseek-chatbot-settings-v1', 32);
+const legacyKey = crypto.scryptSync(config.adminToken, 'deepseek-chatbot-settings-v1', 32);
+const hasSeparateEncryptionKey = config.settingsEncryptionKey !== config.adminToken;
+const key = hasSeparateEncryptionKey
+  ? crypto.scryptSync(config.settingsEncryptionKey, 'deepseek-chatbot-settings-v2', 32)
+  : legacyKey;
+
+function decrypt(packed, encryptionKey) {
+  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey, Buffer.from(packed.iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(packed.tag, 'base64'));
+  return JSON.parse(Buffer.concat([decipher.update(Buffer.from(packed.data, 'base64')), decipher.final()]).toString('utf8'));
+}
 
 export async function loadSettings() {
   try {
     const packed = JSON.parse(await fs.readFile(file, 'utf8'));
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(packed.iv, 'base64'));
-    decipher.setAuthTag(Buffer.from(packed.tag, 'base64'));
-    const plain = Buffer.concat([decipher.update(Buffer.from(packed.data, 'base64')), decipher.final()]);
-    applySettings(JSON.parse(plain.toString('utf8')));
+    try { applySettings(decrypt(packed, key)); }
+    catch (error) {
+      if (!hasSeparateEncryptionKey) throw error;
+      const legacy = decrypt(packed, legacyKey);
+      applySettings(legacy);
+      await saveSettings(legacy);
+      console.info('Encrypted settings migrated to SETTINGS_ENCRYPTION_KEY.');
+    }
   } catch (error) { if (error.code !== 'ENOENT') console.error('Cannot load encrypted settings:', error.message); }
+  if (firebaseIsEnabled()) {
+    try {
+      const remoteFiles = await loadFirebaseKnowledgeFiles();
+      if (remoteFiles.length) config.knowledgeFiles = remoteFiles;
+      else if ((config.knowledgeFiles || []).length) await saveFirebaseKnowledgeFiles(config.knowledgeFiles);
+    } catch (error) { console.error(`Cannot load Firebase knowledge files: ${error.message}`); }
+  }
 }
 
 function applySettings(value) {
@@ -51,12 +73,15 @@ export async function saveSettings(value) {
     iconVersion: value.iconVersion ?? current.iconVersion,
     iconMime: value.iconMime ?? current.iconMime
   };
+  if (firebaseIsEnabled() && Object.hasOwn(value, 'knowledgeFiles')) await saveFirebaseKnowledgeFiles(next.knowledgeFiles);
   applySettings(next);
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(JSON.stringify(next), 'utf8'), cipher.final()]);
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify({ iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: encrypted.toString('base64') }), { mode: 0o600 });
+  const temp = `${file}.${process.pid}.tmp`;
+  await fs.writeFile(temp, JSON.stringify({ iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: encrypted.toString('base64') }), { mode: 0o600 });
+  await fs.rename(temp, file);
 }
 
 export function getPrivateSettings() {

@@ -17,11 +17,12 @@ jobs:
   deploy:
     name: Validate and deploy
     runs-on: [self-hosted, Linux, ARM64, chat-cskh]
+    environment: production
     timeout-minutes: 20
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Validate application
         run: |
