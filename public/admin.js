@@ -14,9 +14,15 @@ async function responseData(response) {
 }
 async function prepareIcon(file) {
   if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Chỉ chấp nhận PNG, JPEG, WebP hoặc GIF.');
-  const image = new Image(); const objectUrl = URL.createObjectURL(file);
+  const image = new Image();
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Không thể đọc file ảnh.'));
+    reader.readAsDataURL(file);
+  });
+  await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error('Không thể giải mã file ảnh.')); image.src = dataUrl; });
   try {
-    await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error('Không thể đọc file ảnh.')); image.src = objectUrl; });
     const scanScale = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
     const scan = document.createElement('canvas'); scan.width = Math.max(1, Math.round(image.naturalWidth * scanScale)); scan.height = Math.max(1, Math.round(image.naturalHeight * scanScale));
     const scanContext = scan.getContext('2d', { willReadFrequently: true }); scanContext.drawImage(image, 0, 0, scan.width, scan.height);
@@ -34,7 +40,7 @@ async function prepareIcon(file) {
     const blob = await new Promise(resolve => output.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('Không thể xử lý file ảnh.');
     return blob;
-  } finally { URL.revokeObjectURL(objectUrl); }
+  } finally { image.src = ''; }
 }
 function updateSnippet() {
   const base = location.origin;
