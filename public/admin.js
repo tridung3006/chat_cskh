@@ -7,6 +7,24 @@ async function api(path, options = {}) {
   if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
   return data;
 }
+async function responseData(response) {
+  const type = response.headers.get('content-type') || '';
+  if (type.includes('application/json')) return response.json();
+  return { error: `Server trả về nội dung không hợp lệ (HTTP ${response.status}).` };
+}
+async function prepareIcon(file) {
+  if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Chỉ chấp nhận PNG, JPEG, WebP hoặc GIF.');
+  const image = new Image(); const objectUrl = URL.createObjectURL(file);
+  try {
+    await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error('Không thể đọc file ảnh.')); image.src = objectUrl; });
+    const scale = Math.min(1, 256 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('Không thể xử lý file ảnh.');
+    return blob;
+  } finally { URL.revokeObjectURL(objectUrl); }
+}
 function updateSnippet() {
   const base = location.origin;
   $('snippet').value = `<script src="${base}/widget.js?v=2" data-api-url="${base}" defer><\/script>`;
@@ -42,13 +60,13 @@ $('settings').onsubmit = async event => {
 };
 $('uploadIcon').onclick = async () => {
   const file = $('iconFile').files[0]; if (!file) return $('iconMsg').textContent = 'Hãy chọn file icon.';
-  try { $('uploadIcon').disabled = true; const response = await fetch('/api/admin/icon', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream', 'x-file-type': file.type }, body: file }); const data = await response.json(); if (!response.ok) throw new Error(data.error); $('iconMsg').className = 'ok'; $('iconMsg').textContent = 'Upload icon thành công.'; }
+  try { $('uploadIcon').disabled = true; $('iconMsg').textContent = 'Đang tối ưu icon…'; const optimized = await prepareIcon(file); const response = await fetch('/api/admin/icon', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream', 'x-file-type': optimized.type }, body: optimized }); const data = await responseData(response); if (!response.ok) throw new Error(data.error); $('iconMsg').className = 'ok'; $('iconMsg').textContent = 'Upload icon thành công.'; }
   catch (error) { $('iconMsg').className = 'err'; $('iconMsg').textContent = error.message; }
   finally { $('uploadIcon').disabled = false; }
 };
 $('uploadKnowledge').onclick = async () => {
   const file = $('knowledgeFile').files[0]; if (!file) return $('fileMsg').textContent = 'Hãy chọn file kiến thức.';
-  try { $('uploadKnowledge').disabled = true; $('fileMsg').textContent = 'Đang đọc file…'; const response = await fetch('/api/admin/knowledge-file', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name) }, body: file }); const data = await response.json(); if (!response.ok) throw new Error(data.error); $('fileMsg').className = 'ok'; $('fileMsg').textContent = 'Upload thành công. Hãy lập chỉ mục lại.'; await loadSettingsIntoForm(); }
+  try { $('uploadKnowledge').disabled = true; $('fileMsg').textContent = 'Đang đọc file…'; const response = await fetch('/api/admin/knowledge-file', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name) }, body: file }); const data = await responseData(response); if (!response.ok) throw new Error(data.error); $('fileMsg').className = 'ok'; $('fileMsg').textContent = 'Upload thành công. Hãy lập chỉ mục lại.'; await loadSettingsIntoForm(); }
   catch (error) { $('fileMsg').className = 'err'; $('fileMsg').textContent = error.message; }
   finally { $('uploadKnowledge').disabled = false; }
 };

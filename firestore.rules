@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // RAG is backend-only. The server authenticates with a service account;
+    // browsers and Firebase client SDKs must never access this database.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
