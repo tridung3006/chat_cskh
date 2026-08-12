@@ -96,11 +96,12 @@ export async function crawlWebsite() {
   const robotUrl = new URL('/robots.txt', config.websiteUrl);
   let robots = robotsParser(robotUrl.href, '');
   try {
+    if (!config.crawlEnabled) throw new Error('Website crawling disabled');
     const response = await fetchPublicText(robotUrl.href, { accept: 'text/plain', maxBytes: 512_000, sameOrigin: config.websiteUrl.origin });
     if (response.status >= 200 && response.status < 300) robots = robotsParser(robotUrl.href, response.text);
   } catch {}
 
-  const queue = [{ url: config.websiteUrl.href, depth: 0 }];
+  const queue = config.crawlEnabled ? [{ url: config.websiteUrl.href, depth: 0 }] : [];
   const seen = new Set();
   const chunks = [];
 

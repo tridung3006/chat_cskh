@@ -17,10 +17,21 @@ async function prepareIcon(file) {
   const image = new Image(); const objectUrl = URL.createObjectURL(file);
   try {
     await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error('Không thể đọc file ảnh.')); image.src = objectUrl; });
-    const scale = Math.min(1, 256 / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const scanScale = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
+    const scan = document.createElement('canvas'); scan.width = Math.max(1, Math.round(image.naturalWidth * scanScale)); scan.height = Math.max(1, Math.round(image.naturalHeight * scanScale));
+    const scanContext = scan.getContext('2d', { willReadFrequently: true }); scanContext.drawImage(image, 0, 0, scan.width, scan.height);
+    const pixels = scanContext.getImageData(0, 0, scan.width, scan.height).data;
+    let left = scan.width, top = scan.height, right = -1, bottom = -1;
+    for (let y = 0; y < scan.height; y++) for (let x = 0; x < scan.width; x++) {
+      if (pixels[(y * scan.width + x) * 4 + 3] > 12) { left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y); }
+    }
+    if (right < left || bottom < top) throw new Error('Ảnh không có nội dung hiển thị.');
+    const sourceWidth = right - left + 1, sourceHeight = bottom - top + 1;
+    const output = document.createElement('canvas'); output.width = 256; output.height = 256;
+    const padding = 8, fit = Math.min((256 - padding * 2) / sourceWidth, (256 - padding * 2) / sourceHeight);
+    const width = sourceWidth * fit, height = sourceHeight * fit;
+    output.getContext('2d').drawImage(scan, left, top, sourceWidth, sourceHeight, (256 - width) / 2, (256 - height) / 2, width, height);
+    const blob = await new Promise(resolve => output.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('Không thể xử lý file ảnh.');
     return blob;
   } finally { URL.revokeObjectURL(objectUrl); }
@@ -41,7 +52,7 @@ function renderFiles(files = []) {
 }
 async function loadSettingsIntoForm() {
   const s = await api('/api/admin/settings');
-  $('model').value = s.model; $('website').value = s.websiteUrl; $('origins').value = s.origins.join(','); $('title').value = s.botTitle; $('color').value = s.botColor; $('extraUrls').value = (s.extraUrls || []).join('\n'); $('customText').value = s.customText || ''; $('instructions').value = s.botInstructions || ''; $('welcome').value = s.welcomeMessage || ''; $('commands').value = (s.commands || []).map(command => `${command.label} | ${command.url}`).join('\n');
+  $('model').value = s.model; $('website').value = s.websiteUrl; $('crawlEnabled').checked = s.crawlEnabled !== false; $('origins').value = s.origins.join(','); $('title').value = s.botTitle; $('color').value = s.botColor; $('extraUrls').value = (s.extraUrls || []).join('\n'); $('customText').value = s.customText || ''; $('instructions').value = s.botInstructions || ''; $('welcome').value = s.welcomeMessage || ''; $('commands').value = (s.commands || []).map(command => `${command.label} | ${command.url}`).join('\n');
   $('keyHint').textContent = s.hasApiKey ? `Đã lưu key: ${s.apiKeyHint}` : 'Chưa có API key'; $('iconMsg').textContent = s.hasIcon ? 'Đã có icon tùy chỉnh.' : 'Đang dùng icon mặc định.'; renderFiles(s.knowledgeFiles); updateSnippet();
 }
 $('loginBtn').onclick = async () => {
@@ -54,7 +65,7 @@ $('loginBtn').onclick = async () => {
 $('settings').onsubmit = async event => {
   event.preventDefault();
   try {
-    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ deepseekKey: $('apiKey').value, model: $('model').value, websiteUrl: $('website').value, origins: $('origins').value, botTitle: $('title').value, botColor: $('color').value, extraUrls: $('extraUrls').value, customText: $('customText').value, botInstructions: $('instructions').value, welcomeMessage: $('welcome').value, commands: $('commands').value }) });
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ deepseekKey: $('apiKey').value, model: $('model').value, websiteUrl: $('website').value, crawlEnabled: $('crawlEnabled').checked, origins: $('origins').value, botTitle: $('title').value, botColor: $('color').value, extraUrls: $('extraUrls').value, customText: $('customText').value, botInstructions: $('instructions').value, welcomeMessage: $('welcome').value, commands: $('commands').value }) });
     $('apiKey').value = ''; $('msg').className = 'ok'; $('msg').textContent = 'Đã lưu và mã hóa cấu hình.'; updateSnippet();
   } catch (error) { $('msg').className = 'err'; $('msg').textContent = error.message; }
 };

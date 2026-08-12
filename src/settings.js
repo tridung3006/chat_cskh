@@ -42,6 +42,7 @@ function applySettings(value) {
   if (value.deepseekKey) config.deepseekKey = value.deepseekKey;
   if (value.model) config.model = value.model;
   if (value.websiteUrl) config.websiteUrl = new URL(value.websiteUrl);
+  config.crawlEnabled = value.crawlEnabled !== false;
   if (Array.isArray(value.origins)) config.origins = value.origins;
   config.botTitle = value.botTitle || 'Trợ lý tư vấn';
   config.botColor = /^#[0-9a-f]{6}$/i.test(value.botColor || '') ? value.botColor : '#111827';
@@ -61,6 +62,7 @@ export async function saveSettings(value) {
     deepseekKey: value.deepseekKey || current.deepseekKey,
     model: value.model || current.model,
     websiteUrl: value.websiteUrl || current.websiteUrl,
+    crawlEnabled: value.crawlEnabled ?? current.crawlEnabled,
     origins: value.origins || current.origins,
     botTitle: value.botTitle || current.botTitle,
     botColor: value.botColor || current.botColor,
@@ -85,7 +87,7 @@ export async function saveSettings(value) {
 }
 
 export function getPrivateSettings() {
-  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], knowledgeFiles: config.knowledgeFiles || [], iconVersion: config.iconVersion || 0, iconMime: config.iconMime || '' };
+  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, crawlEnabled: config.crawlEnabled !== false, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], knowledgeFiles: config.knowledgeFiles || [], iconVersion: config.iconVersion || 0, iconMime: config.iconMime || '' };
 }
 
 export function getPublicAdminSettings() {
