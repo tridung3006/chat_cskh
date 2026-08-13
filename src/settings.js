@@ -51,9 +51,12 @@ function applySettings(value) {
   config.botInstructions = value.botInstructions || '';
   config.welcomeMessage = value.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?';
   config.commands = Array.isArray(value.commands) ? value.commands : [];
+  config.zaloUrl = value.zaloUrl || '';
+  config.messengerUrl = value.messengerUrl || '';
   config.knowledgeFiles = Array.isArray(value.knowledgeFiles) ? value.knowledgeFiles : [];
   config.iconVersion = value.iconVersion || 0;
   config.iconMime = value.iconMime || '';
+  config.contactIcons = value.contactIcons && typeof value.contactIcons === 'object' ? value.contactIcons : {};
 }
 
 export async function saveSettings(value) {
@@ -71,9 +74,12 @@ export async function saveSettings(value) {
     botInstructions: value.botInstructions ?? current.botInstructions,
     welcomeMessage: value.welcomeMessage ?? current.welcomeMessage,
     commands: value.commands ?? current.commands,
+    zaloUrl: value.zaloUrl ?? current.zaloUrl,
+    messengerUrl: value.messengerUrl ?? current.messengerUrl,
     knowledgeFiles: value.knowledgeFiles ?? current.knowledgeFiles,
     iconVersion: value.iconVersion ?? current.iconVersion,
-    iconMime: value.iconMime ?? current.iconMime
+    iconMime: value.iconMime ?? current.iconMime,
+    contactIcons: value.contactIcons ?? current.contactIcons
   };
   if (firebaseIsEnabled() && Object.hasOwn(value, 'knowledgeFiles')) await saveFirebaseKnowledgeFiles(next.knowledgeFiles);
   applySettings(next);
@@ -87,10 +93,10 @@ export async function saveSettings(value) {
 }
 
 export function getPrivateSettings() {
-  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, crawlEnabled: config.crawlEnabled !== false, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], knowledgeFiles: config.knowledgeFiles || [], iconVersion: config.iconVersion || 0, iconMime: config.iconMime || '' };
+  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, crawlEnabled: config.crawlEnabled !== false, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], zaloUrl: config.zaloUrl || '', messengerUrl: config.messengerUrl || '', knowledgeFiles: config.knowledgeFiles || [], iconVersion: config.iconVersion || 0, iconMime: config.iconMime || '', contactIcons: config.contactIcons || {} };
 }
 
 export function getPublicAdminSettings() {
   const s = getPrivateSettings();
-  return { ...s, deepseekKey: '', knowledgeFiles: s.knowledgeFiles.map(file => ({ name: file.name, characters: file.text.length })), hasApiKey: Boolean(s.deepseekKey), apiKeyHint: s.deepseekKey ? `${s.deepseekKey.slice(0, 3)}••••${s.deepseekKey.slice(-4)}` : '', hasIcon: Boolean(s.iconVersion) };
+  return { ...s, deepseekKey: '', knowledgeFiles: s.knowledgeFiles.map(file => ({ name: file.name, characters: file.text.length })), hasApiKey: Boolean(s.deepseekKey), apiKeyHint: s.deepseekKey ? `${s.deepseekKey.slice(0, 3)}••••${s.deepseekKey.slice(-4)}` : '', hasIcon: Boolean(s.iconVersion), contactIconStatus: Object.fromEntries(Object.entries(s.contactIcons).map(([type, value]) => [type, Boolean(value?.version)])) };
 }

@@ -58,8 +58,10 @@ function renderFiles(files = []) {
 }
 async function loadSettingsIntoForm() {
   const s = await api('/api/admin/settings');
-  $('model').value = s.model; $('website').value = s.websiteUrl; $('crawlEnabled').checked = s.crawlEnabled !== false; $('origins').value = s.origins.join(','); $('title').value = s.botTitle; $('color').value = s.botColor; $('extraUrls').value = (s.extraUrls || []).join('\n'); $('customText').value = s.customText || ''; $('instructions').value = s.botInstructions || ''; $('welcome').value = s.welcomeMessage || ''; $('commands').value = (s.commands || []).map(command => `${command.label} | ${command.url}`).join('\n');
-  $('keyHint').textContent = s.hasApiKey ? `Đã lưu key: ${s.apiKeyHint}` : 'Chưa có API key'; $('iconMsg').textContent = s.hasIcon ? 'Đã có icon tùy chỉnh.' : 'Đang dùng icon mặc định.'; renderFiles(s.knowledgeFiles); updateSnippet();
+  $('model').value = s.model; $('website').value = s.websiteUrl; $('crawlEnabled').checked = s.crawlEnabled !== false; $('origins').value = s.origins.join(','); $('title').value = s.botTitle; $('color').value = s.botColor; $('extraUrls').value = (s.extraUrls || []).join('\n'); $('customText').value = s.customText || ''; $('instructions').value = s.botInstructions || ''; $('welcome').value = s.welcomeMessage || ''; $('commands').value = (s.commands || []).map(command => `${command.label} | ${command.url}`).join('\n'); $('zaloUrl').value = s.zaloUrl || ''; $('messengerUrl').value = s.messengerUrl || '';
+  $('keyHint').textContent = s.hasApiKey ? `Đã lưu key: ${s.apiKeyHint}` : 'Chưa có API key'; $('iconMsg').textContent = s.hasIcon ? 'Đã có icon tùy chỉnh.' : 'Đang dùng icon mặc định.';
+  for (const [type, messageId] of [['launcher','launcherIconMsg'],['zalo','zaloIconMsg'],['messenger','messengerIconMsg']]) $(messageId).textContent = s.contactIconStatus?.[type] ? 'Đã có icon tùy chỉnh.' : 'Đang dùng icon mặc định.';
+  renderFiles(s.knowledgeFiles); updateSnippet();
 }
 $('loginBtn').onclick = async () => {
   token = $('token').value.trim();
@@ -71,7 +73,7 @@ $('loginBtn').onclick = async () => {
 $('settings').onsubmit = async event => {
   event.preventDefault();
   try {
-    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ deepseekKey: $('apiKey').value, model: $('model').value, websiteUrl: $('website').value, crawlEnabled: $('crawlEnabled').checked, origins: $('origins').value, botTitle: $('title').value, botColor: $('color').value, extraUrls: $('extraUrls').value, customText: $('customText').value, botInstructions: $('instructions').value, welcomeMessage: $('welcome').value, commands: $('commands').value }) });
+    await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ deepseekKey: $('apiKey').value, model: $('model').value, websiteUrl: $('website').value, crawlEnabled: $('crawlEnabled').checked, origins: $('origins').value, botTitle: $('title').value, botColor: $('color').value, extraUrls: $('extraUrls').value, customText: $('customText').value, botInstructions: $('instructions').value, welcomeMessage: $('welcome').value, commands: $('commands').value, zaloUrl: $('zaloUrl').value, messengerUrl: $('messengerUrl').value }) });
     $('apiKey').value = ''; $('msg').className = 'ok'; $('msg').textContent = 'Đã lưu và mã hóa cấu hình.'; updateSnippet();
   } catch (error) { $('msg').className = 'err'; $('msg').textContent = error.message; }
 };
@@ -81,6 +83,20 @@ $('uploadIcon').onclick = async () => {
   catch (error) { $('iconMsg').className = 'err'; $('iconMsg').textContent = error.message; }
   finally { $('uploadIcon').disabled = false; }
 };
+async function uploadContactIcon(type, fileId, buttonId, messageId) {
+  const file = $(fileId).files[0]; if (!file) return $(messageId).textContent = 'Hãy chọn file icon.';
+  try {
+    $(buttonId).disabled = true; $(messageId).className = 'muted'; $(messageId).textContent = 'Đang tối ưu icon…';
+    const optimized = await prepareIcon(file);
+    const response = await fetch(`/api/admin/contact-icon/${type}`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream', 'x-file-type': optimized.type }, body: optimized });
+    const data = await responseData(response); if (!response.ok) throw new Error(data.error);
+    $(messageId).className = 'ok'; $(messageId).textContent = 'Upload icon thành công.';
+  } catch (error) { $(messageId).className = 'err'; $(messageId).textContent = error.message; }
+  finally { $(buttonId).disabled = false; }
+}
+$('uploadLauncherIcon').onclick = () => uploadContactIcon('launcher', 'launcherIconFile', 'uploadLauncherIcon', 'launcherIconMsg');
+$('uploadZaloIcon').onclick = () => uploadContactIcon('zalo', 'zaloIconFile', 'uploadZaloIcon', 'zaloIconMsg');
+$('uploadMessengerIcon').onclick = () => uploadContactIcon('messenger', 'messengerIconFile', 'uploadMessengerIcon', 'messengerIconMsg');
 $('uploadKnowledge').onclick = async () => {
   const file = $('knowledgeFile').files[0]; if (!file) return $('fileMsg').textContent = 'Hãy chọn file kiến thức.';
   try { $('uploadKnowledge').disabled = true; $('fileMsg').textContent = 'Đang đọc file…'; const response = await fetch('/api/admin/knowledge-file', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name) }, body: file }); const data = await responseData(response); if (!response.ok) throw new Error(data.error); $('fileMsg').className = 'ok'; $('fileMsg').textContent = 'Upload thành công. Hãy lập chỉ mục lại.'; await loadSettingsIntoForm(); }
