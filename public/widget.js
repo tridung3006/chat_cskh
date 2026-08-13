@@ -20,13 +20,6 @@
     }
   } catch {}
 
-  if (!document.getElementById('chatbot-hide-old-contact')) {
-    const style = document.createElement('style');
-    style.id = 'chatbot-hide-old-contact';
-    style.textContent = '.boo-support-sticky{display:none!important}';
-    document.head.append(style);
-  }
-
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483647;font-family:system-ui,sans-serif';
   const shadow = host.attachShadow({ mode: 'closed' });
