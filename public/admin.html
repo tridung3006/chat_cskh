@@ -1,1 +1,177 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chatbot Admin</title><link rel="stylesheet" href="/admin.css"><script src="/admin.js" defer></script></head><body><main class="wrap"><h1>Chatbot Admin</h1><p class="sub">Cấu hình DeepSeek, kiến thức và giao diện chatbot.</p><section id="login" class="card"><label for="token">Mã quản trị (ADMIN_TOKEN)</label><input id="token" type="password" autocomplete="current-password"><div class="actions"><button id="loginBtn">Đăng nhập</button></div><p id="loginMsg"></p></section><section id="panel"><form id="settings"><section class="card"><h2>Cấu hình bot</h2><label>DeepSeek API key</label><input id="apiKey" type="password" autocomplete="new-password" placeholder="Để trống nếu không muốn thay đổi"><p class="muted" id="keyHint"></p><div class="row"><div><label>Model</label><input id="model"></div><div><label>Màu bot</label><input id="color" type="color"></div></div><label>Website để lấy dữ liệu</label><input id="website" type="url"><label class="toggle"><input id="crawlEnabled" type="checkbox" checked> Crawl dữ liệu từ website chính</label><p class="muted toggle-note">Tắt tùy chọn này để chỉ dùng URL bổ sung, nội dung nhập tay và tài liệu upload.</p><label>Allowed origins</label><input id="origins" placeholder="https://example.com,https://www.example.com"><label>Tên chatbot</label><input id="title"><label>Lời chào khi mở chat</label><textarea id="welcome" maxlength="500" placeholder="Xin chào! Tôi có thể giúp gì cho bạn?"></textarea><label>Command nhanh</label><textarea id="commands" placeholder="Liên hệ nhân viên hỗ trợ | https://zalo.me/0123456789"></textarea><p class="muted">Mỗi dòng theo định dạng Tên nút | URL HTTPS. Tối đa 10 command.</p><label>Icon chatbot</label><input id="iconFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><div class="actions"><button type="button" id="uploadIcon">Upload icon</button></div><p id="iconMsg" class="muted"></p></section><section class="card"><h2>Kiến thức bổ sung</h2><label>URL cần đọc thêm</label><textarea id="extraUrls" placeholder="Mỗi dòng một URL HTTPS"></textarea><p class="muted">Tối đa 20 URL công khai. Nội dung được cập nhật khi lập chỉ mục lại.</p><label>Nội dung kiến thức</label><textarea id="customText" class="large" placeholder="FAQ, chính sách, thông tin sản phẩm hoặc nội dung nội bộ được phép sử dụng..."></textarea><label>Upload file kiến thức</label><input id="knowledgeFile" type="file" accept=".txt,.md,.csv,.json,.pdf,.docx"><div class="actions"><button type="button" id="uploadKnowledge">Upload file</button></div><div id="fileList" class="file-list"></div><p id="fileMsg" class="muted"></p><label>Hướng dẫn chatbot</label><textarea id="instructions" placeholder="Ví dụ: Xưng hô thân thiện, không tư vấn ngoài phạm vi sản phẩm..."></textarea><div class="actions"><button type="submit">Lưu cấu hình</button><button type="button" id="reindex">Lập chỉ mục lại</button></div><p id="msg"></p></section></form><section class="card"><h2>HTML gắn vào website</h2><p class="muted">Đặt trước thẻ đóng &lt;/head&gt;. Thay URL backend nếu triển khai trên domain khác.</p><textarea id="snippet" readonly></textarea><div class="actions"><button id="copy">Copy HTML</button></div></section></section></main></body></html>
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Chatbot Admin</title>
+    <link rel="stylesheet" href="/admin.css" />
+    <script src="/admin.js" defer></script>
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Chatbot Admin</h1>
+      <p class="sub">Cấu hình DeepSeek, kiến thức và giao diện chatbot.</p>
+      <section id="login" class="card">
+        <label for="token">Mã quản trị (ADMIN_TOKEN)</label
+        ><input id="token" type="password" autocomplete="current-password" />
+        <div class="actions"><button id="loginBtn">Đăng nhập</button></div>
+        <p id="loginMsg"></p>
+      </section>
+      <section id="panel">
+        <form id="settings">
+          <section class="card">
+            <h2>Cấu hình bot</h2>
+            <label>DeepSeek API key</label
+            ><input
+              id="apiKey"
+              type="password"
+              autocomplete="new-password"
+              placeholder="Để trống nếu không muốn thay đổi"
+            />
+            <p class="muted" id="keyHint"></p>
+            <div class="row">
+              <div><label>Model</label><input id="model" /></div>
+              <div><label>Màu bot</label><input id="color" type="color" /></div>
+            </div>
+            <label>Website để lấy dữ liệu</label
+            ><input id="website" type="url" /><label class="toggle"
+              ><input id="crawlEnabled" type="checkbox" checked /> Crawl dữ liệu
+              từ website chính</label
+            >
+            <p class="muted toggle-note">
+              Tắt tùy chọn này để chỉ dùng URL bổ sung, nội dung nhập tay và tài
+              liệu upload.
+            </p>
+            <label>Allowed origins</label
+            ><input
+              id="origins"
+              placeholder="https://example.com,https://www.example.com"
+            /><label>Tên chatbot</label><input id="title" /><label
+              >Lời chào khi mở chat</label
+            ><textarea
+              id="welcome"
+              maxlength="500"
+              placeholder="Xin chào! Tôi có thể giúp gì cho bạn?"
+            ></textarea>
+            <div class="row contact-fields">
+              <div>
+                <label>URL Zalo</label
+                ><input
+                  id="zaloUrl"
+                  type="url"
+                  placeholder="https://zalo.me/..."
+                />
+              </div>
+              <div>
+                <label>URL Messenger</label
+                ><input
+                  id="messengerUrl"
+                  type="url"
+                  placeholder="https://m.me/..."
+                />
+              </div>
+            </div>
+            <p class="muted">
+              Hai liên kết này xuất hiện trong menu Liên hệ trên website.
+            </p>
+            <div class="contact-icon-grid">
+              <div>
+                <label>Icon nút Liên hệ</label
+                ><input
+                  id="launcherIconFile"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                /><button type="button" id="uploadLauncherIcon">Upload</button>
+                <p id="launcherIconMsg" class="muted"></p>
+              </div>
+              <div>
+                <label>Icon Zalo</label
+                ><input
+                  id="zaloIconFile"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                /><button type="button" id="uploadZaloIcon">Upload</button>
+                <p id="zaloIconMsg" class="muted"></p>
+              </div>
+              <div>
+                <label>Icon Messenger</label
+                ><input
+                  id="messengerIconFile"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                /><button type="button" id="uploadMessengerIcon">Upload</button>
+                <p id="messengerIconMsg" class="muted"></p>
+              </div>
+            </div>
+            <label>Command nhanh trong khung chat</label
+            ><textarea
+              id="commands"
+              placeholder="Liên hệ nhân viên hỗ trợ | https://zalo.me/0123456789"
+            ></textarea>
+            <p class="muted">
+              Mỗi dòng theo định dạng Tên nút | URL HTTPS. Tối đa 10 command.
+            </p>
+            <label>Icon Trợ lý AI</label
+            ><input
+              id="iconFile"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+            />
+            <div class="actions">
+              <button type="button" id="uploadIcon">Upload icon</button>
+            </div>
+            <p id="iconMsg" class="muted"></p>
+          </section>
+          <section class="card">
+            <h2>Kiến thức bổ sung</h2>
+            <label>URL cần đọc thêm</label
+            ><textarea
+              id="extraUrls"
+              placeholder="Mỗi dòng một URL HTTPS"
+            ></textarea>
+            <p class="muted">
+              Tối đa 20 URL công khai. Nội dung được cập nhật khi lập chỉ mục
+              lại.
+            </p>
+            <label>Nội dung kiến thức</label
+            ><textarea
+              id="customText"
+              class="large"
+              placeholder="FAQ, chính sách, thông tin sản phẩm hoặc nội dung nội bộ được phép sử dụng..."
+            ></textarea
+            ><label>Upload file kiến thức</label
+            ><input
+              id="knowledgeFile"
+              type="file"
+              accept=".txt,.md,.csv,.json,.pdf,.docx"
+            />
+            <div class="actions">
+              <button type="button" id="uploadKnowledge">Upload file</button>
+            </div>
+            <div id="fileList" class="file-list"></div>
+            <p id="fileMsg" class="muted"></p>
+            <label>Hướng dẫn chatbot</label
+            ><textarea
+              id="instructions"
+              placeholder="Ví dụ: Xưng hô thân thiện, không tư vấn ngoài phạm vi sản phẩm..."
+            ></textarea>
+            <div class="actions">
+              <button type="submit">Lưu cấu hình</button
+              ><button type="button" id="reindex">Lập chỉ mục lại</button>
+            </div>
+            <p id="msg"></p>
+          </section>
+        </form>
+        <section class="card">
+          <h2>HTML gắn vào website</h2>
+          <p class="muted">
+            Đặt trước thẻ đóng &lt;/head&gt;. Thay URL backend nếu triển khai
+            trên domain khác.
+          </p>
+          <textarea id="snippet" readonly></textarea>
+          <div class="actions"><button id="copy">Copy HTML</button></div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
