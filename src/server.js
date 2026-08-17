@@ -83,7 +83,7 @@ function validImageUpload(body, mime) {
 app.get('/api/widget-config', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   const contactIconUrls = Object.fromEntries([...contactIconTypes].map(type => [type, config.contactIcons?.[type]?.version ? `/api/contact-icon/${type}?v=${config.contactIcons[type].version}` : '']));
-  res.json({ title: config.botTitle || 'Trợ lý tư vấn', color: config.botColor || '#111827', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], zaloUrl: config.zaloUrl || '', messengerUrl: config.messengerUrl || '', contactIconUrls, iconUrl: config.iconVersion ? `/api/bot-icon?v=${config.iconVersion}` : '' });
+  res.json({ title: config.botTitle || 'Trợ lý tư vấn', color: config.botColor || '#111827', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], zaloUrl: config.zaloUrl || '', messengerUrl: config.messengerUrl || '', contactVisibility: config.contactVisibility || { zalo: true, messenger: true, assistant: true }, contactIconUrls, iconUrl: config.iconVersion ? `/api/bot-icon?v=${config.iconVersion}` : '' });
 });
 app.get('/api/bot-icon', async (_req, res) => {
   if (!config.iconVersion) return res.status(404).end();
@@ -120,7 +120,7 @@ app.post('/api/admin/settings', async (req, res) => {
     const commands = String(body.commands || '').split(/\r?\n/).map(line => { const separator = line.indexOf('|'); if (separator < 1) return null; const label = line.slice(0, separator).trim(); const url = line.slice(separator + 1).trim(); try { const parsed = new URL(url); return parsed.protocol === 'https:' && label ? { label: label.slice(0, 60), url: parsed.href } : null; } catch { return null; } }).filter(Boolean);
     if (commands.length > 10) throw new Error('Too many commands');
     const contactUrl = value => { if (!value) return ''; const parsed = new URL(String(value)); if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('Invalid contact URL'); return parsed.href; };
-    await saveSettings({ deepseekKey: String(body.deepseekKey || ''), model: String(body.model || 'deepseek-chat').slice(0, 80), websiteUrl: websiteUrl.href, crawlEnabled: body.crawlEnabled !== false, origins, botTitle: String(body.botTitle || 'Trợ lý tư vấn').slice(0, 80), botColor: body.botColor, extraUrls, customText: String(body.customText || '').slice(0, 100_000), botInstructions: String(body.botInstructions || '').slice(0, 10_000), welcomeMessage: String(body.welcomeMessage || '').slice(0, 500), commands, zaloUrl: contactUrl(body.zaloUrl), messengerUrl: contactUrl(body.messengerUrl) });
+    await saveSettings({ deepseekKey: String(body.deepseekKey || ''), model: String(body.model || 'deepseek-chat').slice(0, 80), websiteUrl: websiteUrl.href, crawlEnabled: body.crawlEnabled !== false, origins, botTitle: String(body.botTitle || 'Trợ lý tư vấn').slice(0, 80), botColor: body.botColor, extraUrls, customText: String(body.customText || '').slice(0, 100_000), botInstructions: String(body.botInstructions || '').slice(0, 10_000), welcomeMessage: String(body.welcomeMessage || '').slice(0, 500), commands, zaloUrl: contactUrl(body.zaloUrl), messengerUrl: contactUrl(body.messengerUrl), contactVisibility: { zalo: body.showZalo !== false, messenger: body.showMessenger !== false, assistant: body.showAssistant !== false } });
     res.json({ ok: true, settings: getPublicAdminSettings() });
   } catch { res.status(400).json({ error: 'Cấu hình không hợp lệ' }); }
 });
