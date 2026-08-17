@@ -53,6 +53,11 @@ function applySettings(value) {
   config.commands = Array.isArray(value.commands) ? value.commands : [];
   config.zaloUrl = value.zaloUrl || '';
   config.messengerUrl = value.messengerUrl || '';
+  config.contactVisibility = {
+    zalo: value.contactVisibility?.zalo !== false,
+    messenger: value.contactVisibility?.messenger !== false,
+    assistant: value.contactVisibility?.assistant !== false
+  };
   config.knowledgeFiles = Array.isArray(value.knowledgeFiles) ? value.knowledgeFiles : [];
   config.iconVersion = value.iconVersion || 0;
   config.iconMime = value.iconMime || '';
@@ -76,6 +81,7 @@ export async function saveSettings(value) {
     commands: value.commands ?? current.commands,
     zaloUrl: value.zaloUrl ?? current.zaloUrl,
     messengerUrl: value.messengerUrl ?? current.messengerUrl,
+    contactVisibility: value.contactVisibility ?? current.contactVisibility,
     knowledgeFiles: value.knowledgeFiles ?? current.knowledgeFiles,
     iconVersion: value.iconVersion ?? current.iconVersion,
     iconMime: value.iconMime ?? current.iconMime,
@@ -93,7 +99,7 @@ export async function saveSettings(value) {
 }
 
 export function getPrivateSettings() {
-  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, crawlEnabled: config.crawlEnabled !== false, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], zaloUrl: config.zaloUrl || '', messengerUrl: config.messengerUrl || '', knowledgeFiles: config.knowledgeFiles || [], iconVersion: config.iconVersion || 0, iconMime: config.iconMime || '', contactIcons: config.contactIcons || {} };
+  return { deepseekKey: config.deepseekKey, model: config.model, websiteUrl: config.websiteUrl.href, crawlEnabled: config.crawlEnabled !== false, origins: config.origins, botTitle: config.botTitle || 'Trợ lý tư vấn', botColor: config.botColor || '#111827', extraUrls: config.extraUrls || [], customText: config.customText || '', botInstructions: config.botInstructions || '', welcomeMessage: config.welcomeMessage || 'Xin chào! Tôi có thể giúp gì cho bạn?', commands: config.commands || [], zaloUrl: config.zaloUrl || '', messengerUrl: config.messengerUrl || '', contactVisibility: config.contactVisibility || { zalo: true, messenger: true, assistant: true }, knowledgeFiles: config.knowledgeFiles || [], iconVersion: config.iconVersion || 0, iconMime: config.iconMime || '', contactIcons: config.contactIcons || {} };
 }
 
 export function getPublicAdminSettings() {

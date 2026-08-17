@@ -5,6 +5,7 @@
   let color = script.dataset.color || '#111827';
   let welcomeMessage = 'Xin chào! Tôi có thể giúp gì cho bạn?';
   let commands = [], iconUrl = '', zaloUrl = '', messengerUrl = '', contactIconUrls = {};
+  let contactVisibility = { zalo: true, messenger: true, assistant: true };
   try {
     const response = await fetch(`${api}/api/widget-config`, { cache: 'no-store' });
     if (response.ok) {
@@ -15,6 +16,7 @@
       if (Array.isArray(remote.commands)) commands = remote.commands;
       if (/^https:\/\//i.test(remote.zaloUrl || '')) zaloUrl = remote.zaloUrl;
       if (/^https:\/\//i.test(remote.messengerUrl || '')) messengerUrl = remote.messengerUrl;
+      if (remote.contactVisibility && typeof remote.contactVisibility === 'object') contactVisibility = { zalo: remote.contactVisibility.zalo !== false, messenger: remote.contactVisibility.messenger !== false, assistant: remote.contactVisibility.assistant !== false };
       if (remote.contactIconUrls && typeof remote.contactIconUrls === 'object') contactIconUrls = Object.fromEntries(Object.entries(remote.contactIconUrls).map(([key, value]) => [key, typeof value === 'string' && value ? (value.startsWith('/') ? `${api}${value}` : value) : '']));
       if (typeof remote.iconUrl === 'string' && remote.iconUrl) iconUrl = remote.iconUrl.startsWith('/') ? `${api}${remote.iconUrl}` : remote.iconUrl;
     }
@@ -36,9 +38,9 @@
     .assistant:hover .contact-text{color:#171717}
   </style>
   <div class="contact-menu" aria-label="Kênh liên hệ">
-    <div class="contact-row"><a class="contact zalo" aria-label="Liên hệ qua Zalo" target="_blank" rel="noopener noreferrer"><span class="contact-sign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5h14v11H9l-4 3V5z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="contact-text">Zalo</span></a></div>
-    <div class="contact-row"><a class="contact messenger" aria-label="Liên hệ qua Messenger" target="_blank" rel="noopener noreferrer"><span class="contact-sign"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.15 2 11.27c0 2.92 1.46 5.52 3.74 7.22V22l3.42-1.88c.9.25 1.86.39 2.84.39 5.52 0 10-4.15 10-9.24S17.52 2 12 2zm1 12.48-2.55-2.72-4.98 2.72 5.48-5.82 2.62 2.72 4.91-2.72L13 14.48z"/></svg></span><span class="contact-text">Messenger</span></a></div>
-    <div class="contact-row"><button class="contact assistant" aria-label="Mở Trợ lý AI"><span class="contact-sign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v12H9l-5 4V5z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg></span><span class="contact-text">Trợ lý AI</span></button></div>
+    <div class="contact-row" data-channel="zalo"><a class="contact zalo" aria-label="Liên hệ qua Zalo" target="_blank" rel="noopener noreferrer"><span class="contact-sign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5h14v11H9l-4 3V5z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="contact-text">Zalo</span></a></div>
+    <div class="contact-row" data-channel="messenger"><a class="contact messenger" aria-label="Liên hệ qua Messenger" target="_blank" rel="noopener noreferrer"><span class="contact-sign"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.15 2 11.27c0 2.92 1.46 5.52 3.74 7.22V22l3.42-1.88c.9.25 1.86.39 2.84.39 5.52 0 10-4.15 10-9.24S17.52 2 12 2zm1 12.48-2.55-2.72-4.98 2.72 5.48-5.82 2.62 2.72 4.91-2.72L13 14.48z"/></svg></span><span class="contact-text">Messenger</span></a></div>
+    <div class="contact-row" data-channel="assistant"><button class="contact assistant" aria-label="Mở Trợ lý AI"><span class="contact-sign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v12H9l-5 4V5z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg></span><span class="contact-text">Trợ lý AI</span></button></div>
   </div>
   <button class="launcher" aria-label="Mở menu Liên hệ" title="Liên hệ"><span class="contact-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.2.6 3.4.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.5 21 3 13.5 3 4.2c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.3.6 3.4.1.4 0 .8-.2 1l-2.3 2.2z"/></svg></span></button>
   <section class="box" aria-label="Chatbot"><div class="head"><svg class="head-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v13H9l-5 4V4z"/><path d="M8 9h.01M12 9h.01M16 9h.01"/></svg><span class="head-title"></span><button class="close" aria-label="Đóng">×</button></div><div class="msgs" aria-live="polite"></div><form class="form"><input maxlength="1000" placeholder="Nhập tin nhắn..." aria-label="Câu hỏi"><button aria-label="Gửi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V4M5 11l7-7 7 7"/></svg></button></form></section>`;
@@ -46,6 +48,8 @@
   const launcher = shadow.querySelector('.launcher'), menu = shadow.querySelector('.contact-menu'), box = shadow.querySelector('.box');
   const msgs = shadow.querySelector('.msgs'), form = shadow.querySelector('form'), input = shadow.querySelector('input');
   const zalo = shadow.querySelector('.zalo'), messenger = shadow.querySelector('.messenger'), assistant = shadow.querySelector('.assistant');
+  for (const [channel, visible] of Object.entries(contactVisibility)) if (!visible) shadow.querySelector(`[data-channel="${channel}"]`)?.remove();
+  if (!menu.querySelector('.contact-row')) launcher.style.display = 'none';
   shadow.querySelector('.head-title').textContent = title;
   const configureLink = (element, url) => { if (url) element.href = url; else { element.classList.add('disabled'); element.removeAttribute('href'); element.title = 'Chưa cấu hình URL trong trang admin'; } };
   configureLink(zalo, zaloUrl); configureLink(messenger, messengerUrl);
